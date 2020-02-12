@@ -1,0 +1,7 @@
+<?xml version='1.0'?>
+<launch>
+    <node pkg="optitrack_bridge" type="optitrack_bridge_node" name="optitrack_bridge_node" output="screen">
+        <param name="frame_id" value="/world" type="str" />
+        <param name="showLatency" value="false" type="bool" />
+    </node>
+</launch>
