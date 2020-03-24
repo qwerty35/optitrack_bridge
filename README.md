@@ -15,7 +15,7 @@ This code is based on the NatNet 3.1 SDK (https://optitrack.com/products/natnet-
 
     git clone https://github.com/qwerty35/optitrack_bridge.git
 
-catkin build
+    catkin build
 
 
 3.Usage
