@@ -26,39 +26,37 @@ typedef Matrix<double, m, 1> MVector;
 class LinearKalmanFilter {
 public:
     LinearKalmanFilter();
+    nav_msgs::Odometry pose_cb(const geometry_msgs::PoseStamped& msg);
+
 private:
-    FMatrix F = FMatrix::Zero();
-    GMatrix G = GMatrix::Zero();
-    QMatrix Q = QMatrix::Zero();
-    RMatrix R = RMatrix::Zero();
-    HMatrix H = HMatrix::Zero();
+    FMatrix F;
+    GMatrix G;
+    QMatrix Q;
+//    RMatrix R;
+    HMatrix H;
 
-    NVector x_old = NVector::Zero();
-    NVector x_predict = NVector::Zero();
-    NVector x_estimate = NVector::Zero();
-    PMatrix P_old = PMatrix::Zero();
-    PMatrix P_predict = PMatrix::Zero();
-    PMatrix P_estimate = PMatrix::Zero();
+    NVector x_old;
+    NVector x_predict;
+    NVector x_estimate;
+    PMatrix P_old;
+    PMatrix P_predict;
+    PMatrix P_estimate;
 
-    MVector sigma_Q = MVector::Zero();
-    MVector sigma_R = MVector::Zero();
+    MVector sigma_Q;
+    MVector sigma_R;
 
     geometry_msgs::PoseStamped pose_old, pose_new;
     geometry_msgs::TwistStamped twist, twist_raw;
     nav_msgs::Odometry odom;
 
-    ros::Subscriber pose_sub;
-    ros::Publisher odom_pub, twist_pub_raw;
-
     ros::WallTime t_old, t_new;
     bool initialized = false;
 
-    void pose_cb(const geometry_msgs::PoseStamped::ConstPtr& msg);
     void predict(const double &dt);
-    FMatrix computeF(const double &dt);
-    GMatrix computeG(const double &dt);
-    QMatrix computeQ(const GMatrix &G, const MVector &sigma_Q);
-    void update(const double &dt, const geometry_msgs::PoseStamped::ConstPtr &msg);
+    static FMatrix computeF(const double &dt);
+    static GMatrix computeG(const double &dt);
+    static QMatrix computeQ(const GMatrix &G, const MVector &sigma_Q);
+    void update(const double &dt, const geometry_msgs::PoseStamped& msg);
     RMatrix computeR();
 };
 

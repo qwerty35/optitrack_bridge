@@ -32,7 +32,8 @@ public:
 
 private:
     ros::NodeHandle nh;
-    std::vector<ros::Publisher> pubs_vision_pose;
+    std::vector<ros::Publisher> pubs_vision_odom;
+    std::vector<std::unique_ptr<LinearKalmanFilter>> linearKalmanFilters;
     std::string prefix;
     std::string frame_id;
     bool showLatency;

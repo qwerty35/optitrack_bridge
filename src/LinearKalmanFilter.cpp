@@ -5,10 +5,24 @@
 #include "../include/LinearKalmanFilter.h"
 
 LinearKalmanFilter::LinearKalmanFilter() {
+    F = FMatrix::Zero();
+    G = GMatrix::Zero();
+    Q = QMatrix::Zero();
+//    R = RMatrix::Zero();
+    H = HMatrix::Zero();
 
+    x_old = NVector::Zero();
+    x_predict = NVector::Zero();
+    x_estimate = NVector::Zero();
+    P_old = PMatrix::Zero();
+    P_predict = PMatrix::Zero();
+    P_estimate = PMatrix::Zero();
+
+    sigma_Q = MVector::Zero();
+    sigma_R = MVector::Zero();
 }
 
-void pose_cb(const geometry_msgs::PoseStamped::ConstPtr& msg)
+nav_msgs::Odometry LinearKalmanFilter::pose_cb(const geometry_msgs::PoseStamped& msg)
 {
     if(initialized)
     {
@@ -28,13 +42,13 @@ void pose_cb(const geometry_msgs::PoseStamped::ConstPtr& msg)
         twist.twist.linear.y = x_estimate(4,0);
         twist.twist.linear.z = x_estimate(5,0);
         //twist_pub.publish(twist);
-        odom.pose.pose = msg->pose;
+        odom.pose.pose = msg.pose;
 
         //convert from inertial velocity to body velocity
-        double q0 = msg->pose.orientation.w;
-        double q1 = msg->pose.orientation.x;
-        double q2 = msg->pose.orientation.y;
-        double q3 = msg->pose.orientation.z;
+        double q0 = msg.pose.orientation.w;
+        double q1 = msg.pose.orientation.x;
+        double q2 = msg.pose.orientation.y;
+        double q3 = msg.pose.orientation.z;
         double phi = atan2(2*(q0*q1 + q2*q3),1-2*(q1*q1+q2*q2));
         double theta = asin(2*(q0*q2-q3*q1));
         double psi = atan2(2*(q0*q3 + q1*q2),1-2*(q2*q2+q3*q3));
@@ -57,16 +71,14 @@ void pose_cb(const geometry_msgs::PoseStamped::ConstPtr& msg)
         odom.twist.twist.linear.x = twist_vector(0);
         odom.twist.twist.linear.y = twist_vector(1);
         odom.twist.twist.linear.z = twist_vector(2);
+//        odom_pub.publish(odom);
 
-        odom_pub.publish(odom);
-
-        pose_new = *msg;
+        pose_new = msg;
         twist_raw.header.stamp = t_now;
         twist_raw.twist.linear.x = (pose_new.pose.position.x-pose_old.pose.position.x)/dt;
         twist_raw.twist.linear.y = (pose_new.pose.position.y-pose_old.pose.position.y)/dt;
         twist_raw.twist.linear.z = (pose_new.pose.position.z-pose_old.pose.position.z)/dt;
         //twist_pub_raw.publish(twist_raw);
-
 
         x_old = x_estimate;
         P_old = P_estimate;
@@ -76,9 +88,9 @@ void pose_cb(const geometry_msgs::PoseStamped::ConstPtr& msg)
     else
     {
         t_old = ros::WallTime::now();
-        x_old(0,0) = msg->pose.position.x;
-        x_old(1,0) = msg->pose.position.y;
-        x_old(2,0) = msg->pose.position.z;
+        x_old(0,0) = msg.pose.position.x;
+        x_old(1,0) = msg.pose.position.y;
+        x_old(2,0) = msg.pose.position.z;
 
         P_old(0,0) = 0.1;
         P_old(1,1) = 0.1;
@@ -87,12 +99,14 @@ void pose_cb(const geometry_msgs::PoseStamped::ConstPtr& msg)
         P_old(4,4) = 1.1;
         P_old(5,5) = 1.1;
 
-        if(PUBLISH_RAW_TWIST) pose_old = *msg;
+        if(PUBLISH_RAW_TWIST) pose_old = msg;
         initialized = true;
     }
+
+    return odom;
 }
 
-void predict(const double &dt)
+void LinearKalmanFilter::predict(const double &dt)
 {
     F = computeF(dt);
     G = computeG(dt);
@@ -102,12 +116,12 @@ void predict(const double &dt)
     P_predict = F*P_old*F.transpose() + Q;
 }
 
-void update(const double &dt, const geometry_msgs::PoseStamped::ConstPtr& msg)
+void LinearKalmanFilter::update(const double &dt, const geometry_msgs::PoseStamped& msg)
 {
     MVector measure = MVector::Zero();
-    measure(0,0) = msg->pose.position.x;
-    measure(1,0) = msg->pose.position.y;
-    measure(2,0) = msg->pose.position.z;
+    measure(0,0) = msg.pose.position.x;
+    measure(1,0) = msg.pose.position.y;
+    measure(2,0) = msg.pose.position.z;
 
     MVector residual = measure - H*x_predict;
     RMatrix R = computeR();
@@ -118,7 +132,7 @@ void update(const double &dt, const geometry_msgs::PoseStamped::ConstPtr& msg)
     P_estimate = P_predict - K*innovation*K.transpose();
 }
 
-FMatrix computeF(const double &dt)
+FMatrix LinearKalmanFilter::computeF(const double &dt)
 {
     FMatrix temp = FMatrix::Zero();
     for(int i=0; i<n; i++)
@@ -132,7 +146,7 @@ FMatrix computeF(const double &dt)
     return temp;
 }
 
-GMatrix computeG(const double &dt)
+GMatrix LinearKalmanFilter::computeG(const double &dt)
 {
     GMatrix temp = GMatrix::Zero();
     for(int i=0; i<3; i++)
@@ -144,7 +158,7 @@ GMatrix computeG(const double &dt)
     return temp;
 }
 
-QMatrix computeQ(const GMatrix &G, const MVector &sigma_Q)
+QMatrix LinearKalmanFilter::computeQ(const GMatrix &G, const MVector &sigma_Q)
 {
     RMatrix temp = RMatrix::Zero();
     for(int i=0; i<m; i++)
@@ -155,7 +169,7 @@ QMatrix computeQ(const GMatrix &G, const MVector &sigma_Q)
     return G*temp*G.transpose();
 }
 
-RMatrix computeR()
+RMatrix LinearKalmanFilter::computeR()
 {
     RMatrix temp = RMatrix::Zero();
     for(int i=0; i<m; i++)
