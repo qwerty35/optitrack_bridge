@@ -7,10 +7,14 @@ project(optitrack_bridge)
 ## Find catkin macros and libraries
 ## if COMPONENTS list like find_package(catkin REQUIRED COMPONENTS xyz)
 ## is used, also find other catkin packages
+find_package(Eigen3 REQUIRED)
+include_directories(${EIGEN3_INCLUDE_DIR})
+
 find_package(catkin REQUIRED COMPONENTS
   roscpp
   std_msgs
 )
+
 
 ## System dependencies are found with CMake's conventions
 # find_package(Boost REQUIRED COMPONENTS system)
@@ -122,6 +126,7 @@ include_directories(
 ## Declare a C++ library
 add_library(NatNetWrapper
   src/NatNetWrapper.cpp
+  src/LinearKalmanFilter.cpp
 )
 target_link_libraries(NatNetWrapper
   ${PROJECT_SOURCE_DIR}/lib/libNatNetLibShared.so

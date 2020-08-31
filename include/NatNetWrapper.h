@@ -19,7 +19,7 @@
 #include <NatNetTypes.h>
 #include <NatNetCAPI.h>
 #include <NatNetClient.h>
-
+#include <LinearKalmanFilter.h>
 
 class NatNetWrapper {
 public:
@@ -53,6 +53,5 @@ private:
     char g_discoveredMulticastGroupAddr[kNatNetIpv4AddrStrLenMax] = NATNET_DEFAULT_MULTICAST_ADDRESS;
     int g_analogSamplesPerMocapFrame = 0;
     sServerDescription g_serverDescription;
-
 };
 

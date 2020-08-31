@@ -18,6 +18,7 @@ NatNetWrapper::NatNetWrapper(){
     nh.param<bool>("showLatency", showLatency, false);
     prefix = "/optitrack/";
     verbose_level = Verbosity_Error + 1; // Do not listen NatNetlib message
+
 }
 
 int NatNetWrapper::run() {
@@ -396,6 +397,7 @@ void NATNET_CALLCONV NatNetWrapper::DataHandler(sFrameOfMocapData* data, void* p
                 vision_pose.pose.orientation.y = data->RigidBodies[i].qy;
                 vision_pose.pose.orientation.z = data->RigidBodies[i].qz;
                 vision_pose.pose.orientation.w = data->RigidBodies[i].qw;
+
 
                 pubs_vision_pose[i].publish(vision_pose);
             } else {
