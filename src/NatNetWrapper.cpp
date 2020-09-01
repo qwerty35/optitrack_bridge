@@ -395,7 +395,10 @@ void NATNET_CALLCONV NatNetWrapper::DataHandler(sFrameOfMocapData* data, void* p
                 vision_pose.pose.orientation.y = data->RigidBodies[i].qy;
                 vision_pose.pose.orientation.z = data->RigidBodies[i].qz;
                 vision_pose.pose.orientation.w = data->RigidBodies[i].qw;
-                pubs_vision_odom[i].publish(linearKalmanFilters[i].get()->pose_cb(vision_pose));
+                nav_msgs::Odometry vision_odom = linearKalmanFilters[i].get()->pose_cb(vision_pose);
+                vision_odom.header.frame_id = frame_id;
+                vision_odom.child_frame_id = frame_id;
+                pubs_vision_odom[i].publish(vision_odom);
             } else {
                 ROS_WARN_STREAM("[NatNetWrapper] " << pubs_vision_odom[i].getTopic() << " is not published");
             }

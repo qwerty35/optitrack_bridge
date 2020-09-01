@@ -20,6 +20,17 @@ LinearKalmanFilter::LinearKalmanFilter() {
 
     sigma_Q = MVector::Zero();
     sigma_R = MVector::Zero();
+
+    sigma_Q(0,0) = 20.0;
+    sigma_Q(1,0) = 20.0;
+    sigma_Q(2,0) = 20.0;
+    sigma_R(0,0) = 0.001;
+    sigma_R(1,0) = 0.001;
+    sigma_R(2,0) = 0.001;
+
+    H(0,0) = 1.0;
+    H(1,1) = 1.0;
+    H(2,2) = 1.0;
 }
 
 nav_msgs::Odometry LinearKalmanFilter::pose_cb(const geometry_msgs::PoseStamped& msg)
@@ -99,7 +110,10 @@ nav_msgs::Odometry LinearKalmanFilter::pose_cb(const geometry_msgs::PoseStamped&
         P_old(4,4) = 1.1;
         P_old(5,5) = 1.1;
 
-        if(PUBLISH_RAW_TWIST) pose_old = msg;
+        if(PUBLISH_RAW_TWIST) {
+            pose_old = msg;
+        }
+
         initialized = true;
     }
 
