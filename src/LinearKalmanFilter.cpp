@@ -78,7 +78,9 @@ nav_msgs::Odometry LinearKalmanFilter::pose_cb(const geometry_msgs::PoseStamped&
         twist_vector(0) = twist.twist.linear.x;
         twist_vector(1) = twist.twist.linear.y;
         twist_vector(2) = twist.twist.linear.z;
-        twist_vector = R.transpose()*twist_vector;
+
+        //twist_vector = R.transpose()*twist_vector; //TODO: add param to control this
+
         odom.twist.twist.linear.x = twist_vector(0);
         odom.twist.twist.linear.y = twist_vector(1);
         odom.twist.twist.linear.z = twist_vector(2);
