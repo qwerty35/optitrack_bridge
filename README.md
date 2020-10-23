@@ -1,6 +1,9 @@
 # optitrack_bridge
 
-optitrack bridge for ROS Kinetic, Ubuntu 16.04
+This package converts Optitrack object pose to ROS message.
+
+Tested in [ROS Melodic, Ubuntu 18.04], [ROS Kinetic, Ubuntu 16.04]
+
 
 1.Note
 ------
@@ -15,7 +18,7 @@ This code is based on the NatNet 3.1 SDK (https://optitrack.com/products/natnet-
 
     git clone https://github.com/qwerty35/optitrack_bridge.git
 
-    catkin build
+    catkin build optitrack_bridge (or catkin_make)
 
 
 3.Usage

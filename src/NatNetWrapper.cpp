@@ -18,7 +18,6 @@ NatNetWrapper::NatNetWrapper(){
     nh.param<bool>("showLatency", showLatency, false);
     prefix = "/optitrack/";
     verbose_level = Verbosity_Error + 1; // Do not listen NatNetlib message
-
 }
 
 int NatNetWrapper::run() {
@@ -46,7 +45,7 @@ int NatNetWrapper::run() {
     NatNet_CreateAsyncServerDiscovery( &discovery, serverCallbackWrapper );
 
     ros::Rate rate(10);
-    while(!is_ServerDiscovered) {
+    while(ros::ok() and !is_ServerDiscovered) {
         rate.sleep();
     }
 
@@ -224,6 +223,10 @@ int NatNetWrapper::run() {
     bool bExit = false;
     while(c=getch())
     {
+        if(!ros::ok()){
+            break;
+        }
+
         switch(c)
         {
             case 'q':
@@ -646,7 +649,6 @@ void NatNetWrapper::resetClient()
     if(iSuccess != 0)
         printf("error re-initting Client\n");
 }
-
 
 #ifndef _WIN32
 char NatNetWrapper::getch()
