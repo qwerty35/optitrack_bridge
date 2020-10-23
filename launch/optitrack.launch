@@ -2,6 +2,7 @@
 <launch>
     <node pkg="optitrack_bridge" type="optitrack_bridge_node" name="optitrack_bridge_node" output="screen">
         <param name="frame_id" value="/world" type="str" />
-        <param name="showLatency" value="false" type="bool" />
+        <param name="show_latency" value="false" type="bool" />
+        <param name="publish_with_twist" value="false" type="bool" />
     </node>
 </launch>

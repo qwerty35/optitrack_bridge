@@ -15,7 +15,8 @@ NatNetWrapper::NatNetWrapper(){
     NatNetWrapper_ptr = this;
     nh = ros::NodeHandle("~");
     nh.param<std::string>("frame_id", frame_id, "/world");
-    nh.param<bool>("showLatency", showLatency, false);
+    nh.param<bool>("show_latency", show_latency, false);
+    nh.param<bool>("publish_with_twist", publish_with_twist, false);
     prefix = "/optitrack/";
     verbose_level = Verbosity_Error + 1; // Do not listen NatNetlib message
 }
@@ -146,8 +147,14 @@ int NatNetWrapper::run() {
                 printf("RigidBody ID : %d\n", pRB->ID);
 //                printf("RigidBody Parent ID : %d\n", pRB->parentID);
 //                printf("Parent Offset : %3.2f,%3.2f,%3.2f\n", pRB->offsetx, pRB->offsety, pRB->offsetz);
-                pubs_vision_odom.push_back(nh.advertise<nav_msgs::Odometry>(prefix + std::string(pRB->szName) + "/" + std::string(pRB->szName), 10));
-                linearKalmanFilters.emplace_back(std::make_unique<LinearKalmanFilter>());
+                if(publish_with_twist){
+                    pubs_vision_odom.push_back(nh.advertise<nav_msgs::Odometry>(prefix + std::string(pRB->szName) + "/" + std::string(pRB->szName), 10));
+                    linearKalmanFilters.emplace_back(std::make_unique<LinearKalmanFilter>());
+                }
+                else{
+                    pubs_vision_pose.push_back(nh.advertise<geometry_msgs::PoseStamped>(prefix + std::string(pRB->szName) + "/" + std::string(pRB->szName), 10));
+                }
+
 //                if ( pRB->MarkerPositions != NULL && pRB->MarkerRequiredLabels != NULL )
 //                {
 //                    for ( int markerIdx = 0; markerIdx < pRB->nMarkers; ++markerIdx )
@@ -333,7 +340,7 @@ void NATNET_CALLCONV NatNetWrapper::DataHandler(sFrameOfMocapData* data, void* p
     // If it's unavailable (for example, with USB camera systems, or during playback), this field will be zero.
     const bool bSystemLatencyAvailable = data->CameraMidExposureTimestamp != 0;
 
-    if(showLatency) {
+    if(show_latency) {
         if (bSystemLatencyAvailable) {
             // System latency here is defined as the span of time between:
             //   a) The midpoint of the camera exposure window, and therefore the average age of the photons (CameraMidExposureTimestamp)
@@ -379,14 +386,14 @@ void NATNET_CALLCONV NatNetWrapper::DataHandler(sFrameOfMocapData* data, void* p
 
     // Rigid Bodies
 //    printf("Rigid Bodies [Count=%d]\n", data->nRigidBodies);
-    for(i=0; i < data->nRigidBodies; i++)
-    {
+    for(i=0; i < data->nRigidBodies; i++) {
         // params
         // 0x01 : bool, rigid body was successfully tracked in this frame
         bool bTrackingValid = data->RigidBodies[i].params & 0x01;
 
 //        printf("Rigid Body [ID=%d  Error=%3.2f  Valid=%d]\n", data->RigidBodies[i].ID, data->RigidBodies[i].MeanError, bTrackingValid);
-        if(pubs_vision_odom.size() == data->nRigidBodies) {
+        if ((!publish_with_twist && pubs_vision_pose.size() == data->nRigidBodies) or
+            (publish_with_twist && pubs_vision_odom.size() == data->nRigidBodies)) {
             if (bTrackingValid) {
                 geometry_msgs::PoseStamped vision_pose;
                 vision_pose.header.stamp = ros::Time::now();
@@ -398,16 +405,23 @@ void NATNET_CALLCONV NatNetWrapper::DataHandler(sFrameOfMocapData* data, void* p
                 vision_pose.pose.orientation.y = data->RigidBodies[i].qy;
                 vision_pose.pose.orientation.z = data->RigidBodies[i].qz;
                 vision_pose.pose.orientation.w = data->RigidBodies[i].qw;
-                nav_msgs::Odometry vision_odom = linearKalmanFilters[i].get()->pose_cb(vision_pose);
-                vision_odom.header.frame_id = frame_id;
-                vision_odom.child_frame_id = frame_id;
-                pubs_vision_odom[i].publish(vision_odom);
+                if (publish_with_twist) {
+                    nav_msgs::Odometry vision_odom = linearKalmanFilters[i].get()->pose_cb(vision_pose);
+                    vision_odom.header.frame_id = frame_id;
+                    vision_odom.child_frame_id = frame_id;
+                    pubs_vision_odom[i].publish(vision_odom);
+                } else {
+                    pubs_vision_pose[i].publish(vision_pose);
+                }
             } else {
-                ROS_WARN_STREAM("[NatNetWrapper] " << pubs_vision_odom[i].getTopic() << " is not published");
+                if (publish_with_twist) {
+                    ROS_WARN_STREAM("[NatNetWrapper] " << pubs_vision_odom[i].getTopic() << " is not published");
+                } else {
+                    ROS_WARN_STREAM("[NatNetWrapper] " << pubs_vision_pose[i].getTopic() << " is not published");
+                }
             }
         }
     }
-
 //    // Skeletons
 //    printf("Skeletons [Count=%d]\n", data->nSkeletons);
 //    for(i=0; i < data->nSkeletons; i++)
