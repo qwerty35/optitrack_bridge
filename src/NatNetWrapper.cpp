@@ -45,9 +45,9 @@ int NatNetWrapper::run() {
     NatNetDiscoveryHandle discovery;
     NatNet_CreateAsyncServerDiscovery( &discovery, serverCallbackWrapper );
 
-    ros::Rate rate(10);
+    ros::Rate server_wait_rate(10);
     while(ros::ok() and !is_ServerDiscovered) {
-        rate.sleep();
+        server_wait_rate.sleep();
     }
 
     const size_t serverIndex = 0;
@@ -228,12 +228,10 @@ int NatNetWrapper::run() {
     printf("\nClient is connected to server and listening for data...\n");
     int c;
     bool bExit = false;
-    while(c=getch())
+    ros::Rate main_rate(100);
+    while(ros::ok())
     {
-        if(!ros::ok()){
-            break;
-        }
-
+        c=getch();
         switch(c)
         {
             case 'q':
@@ -297,6 +295,8 @@ int NatNetWrapper::run() {
         }
         if(bExit)
             break;
+
+        main_rate.sleep();
     }
 
     // Done - clean up.
