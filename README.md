@@ -30,9 +30,9 @@ This code is based on the NatNet 3.1 SDK (https://optitrack.com/products/natnet-
 
 4.Parameters
 -----
-"frame_id": frame id of message.
+"frame_id": set frame id of message.
 
-"show_latency": print latency info at the console.
+"show_latency": print latency on the screen.
 
 "publish_with_twist":
 
@@ -40,3 +40,6 @@ This code is based on the NatNet 3.1 SDK (https://optitrack.com/products/natnet-
 
 + False - it returns object's pose as geometry::poseStamped message.
 
+"publish_labeled_marker_pose_array": if true, publish pose of object's markers as geometry::poseArray
+
+"publish_unlabeled_marker_pose_array": if true, publish unlabeled markers as geometry::poseArray

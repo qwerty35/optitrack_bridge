@@ -17,6 +17,8 @@ NatNetWrapper::NatNetWrapper(){
     nh.param<std::string>("frame_id", frame_id, "/world");
     nh.param<bool>("show_latency", show_latency, false);
     nh.param<bool>("publish_with_twist", publish_with_twist, false);
+    nh.param<bool>("publish_labeled_marker_pose_array", publish_labeled_marker_pose_array, false);
+    nh.param<bool>("publish_unlabeled_marker_pose_array", publish_unlabeled_marker_pose_array, false);
     prefix = "/optitrack/";
     verbose_level = Verbosity_Error + 1; // Do not listen NatNetlib message
 }
@@ -130,15 +132,15 @@ int NatNetWrapper::run() {
         for(int i=0; i < pDataDefs->nDataDescriptions; i++)
         {
 //            printf("Data Description # %d (type=%d)\n", i, pDataDefs->arrDataDescriptions[i].type);
-//            if(pDataDefs->arrDataDescriptions[i].type == Descriptor_MarkerSet)
-//            {
-//                // MarkerSet
-//                sMarkerSetDescription* pMS = pDataDefs->arrDataDescriptions[i].Data.MarkerSetDescription;
-//                printf("MarkerSet Name : %s\n", pMS->szName);
-//                for(int i=0; i < pMS->nMarkers; i++)
-//                    printf("%s\n", pMS->szMarkerNames[i]);
-//
-//            }
+            if(pDataDefs->arrDataDescriptions[i].type == Descriptor_MarkerSet)
+            {
+                // MarkerSet
+                sMarkerSetDescription* pMS = pDataDefs->arrDataDescriptions[i].Data.MarkerSetDescription;
+                printf("MarkerSet Name : %s\n", pMS->szName);
+                for(int j = 0; j < pMS->nMarkers; j++)
+                    printf("%s\n", pMS->szMarkerNames[j]);
+
+            }
             if(pDataDefs->arrDataDescriptions[i].type == Descriptor_RigidBody)
             {
                 // RigidBody
@@ -147,12 +149,18 @@ int NatNetWrapper::run() {
                 printf("RigidBody ID : %d\n", pRB->ID);
 //                printf("RigidBody Parent ID : %d\n", pRB->parentID);
 //                printf("Parent Offset : %3.2f,%3.2f,%3.2f\n", pRB->offsetx, pRB->offsety, pRB->offsetz);
+
+                model_ids.emplace_back(pRB->ID);
                 if(publish_with_twist){
-                    pubs_vision_odom.push_back(nh.advertise<nav_msgs::Odometry>(prefix + std::string(pRB->szName) + "/" + std::string(pRB->szName), 10));
+                    pubs_vision_odom.push_back(nh.advertise<nav_msgs::Odometry>(prefix + std::string(pRB->szName) + "/odometry", 10));
                     linearKalmanFilters.emplace_back(std::make_unique<LinearKalmanFilter>());
                 }
                 else{
-                    pubs_vision_pose.push_back(nh.advertise<geometry_msgs::PoseStamped>(prefix + std::string(pRB->szName) + "/" + std::string(pRB->szName), 10));
+                    pubs_vision_pose.push_back(nh.advertise<geometry_msgs::PoseStamped>(prefix + std::string(pRB->szName) + "/poseStamped", 10));
+                }
+
+                if(publish_labeled_marker_pose_array){
+                    pubs_labeled_marker_pose_array.emplace_back(nh.advertise<geometry_msgs::PoseArray>(prefix + std::string(pRB->szName) + "/markerPoseArray", 10));
                 }
 
 //                if ( pRB->MarkerPositions != NULL && pRB->MarkerRequiredLabels != NULL )
@@ -221,6 +229,9 @@ int NatNetWrapper::run() {
 //                printf("Unknown data type.");
 //                // Unknown
 //            }
+        }
+        if(publish_unlabeled_marker_pose_array){
+            pub_unlabeled_marker_pose_array = nh.advertise<geometry_msgs::PoseArray>(prefix + "unlabeled/markerPoseArray", 10);
         }
     }
 
@@ -436,38 +447,41 @@ void NATNET_CALLCONV NatNetWrapper::DataHandler(sFrameOfMocapData* data, void* p
 //        }
 //    }
 
-//    // labeled markers - this includes all markers (Active, Passive, and 'unlabeled' (markers with no asset but a PointCloud ID)
-//    bool bOccluded;     // marker was not visible (occluded) in this frame
-//    bool bPCSolved;     // reported position provided by point cloud solve
-//    bool bModelSolved;  // reported position provided by model solve
-//    bool bHasModel;     // marker has an associated asset in the data stream
-//    bool bUnlabeled;    // marker is 'unlabeled', but has a point cloud ID that matches Motive PointCloud ID (In Motive 3D View)
-//    bool bActiveMarker; // marker is an actively labeled LED marker
-//
+    // labeled markers - this includes all markers (Active, Passive, and 'unlabeled' (markers with no asset but a PointCloud ID)
+    if(publish_labeled_marker_pose_array || publish_unlabeled_marker_pose_array){
+        std::vector<geometry_msgs::PoseArray> labeled_marker_pose_array;
+        labeled_marker_pose_array.resize(model_ids.size());
+        geometry_msgs::PoseArray unlabeled_marker_pose_array;
+        bool bOccluded;     // marker was not visible (occluded) in this frame
+        bool bPCSolved;     // reported position provided by point cloud solve
+        bool bModelSolved;  // reported position provided by model solve
+        bool bHasModel;     // marker has an associated asset in the data stream
+        bool bUnlabeled;    // marker is 'unlabeled', but has a point cloud ID that matches Motive PointCloud ID (In Motive 3D View)
+        bool bActiveMarker; // marker is an actively labeled LED marker
+
 //    printf("Markers [Count=%d]\n", data->nLabeledMarkers);
-//    for(i=0; i < data->nLabeledMarkers; i++)
-//    {
-//        bOccluded = ((data->LabeledMarkers[i].params & 0x01)!=0);
-//        bPCSolved = ((data->LabeledMarkers[i].params & 0x02)!=0);
-//        bModelSolved = ((data->LabeledMarkers[i].params & 0x04) != 0);
-//        bHasModel = ((data->LabeledMarkers[i].params & 0x08) != 0);
-//        bUnlabeled = ((data->LabeledMarkers[i].params & 0x10) != 0);
-//        bActiveMarker = ((data->LabeledMarkers[i].params & 0x20) != 0);
-//
-//        sMarker marker = data->LabeledMarkers[i];
-//
-//        // Marker ID Scheme:
-//        // Active Markers:
-//        //   ID = ActiveID, correlates to RB ActiveLabels list
-//        // Passive Markers:
-//        //   If Asset with Legacy Labels
-//        //      AssetID 	(Hi Word)
-//        //      MemberID	(Lo Word)
-//        //   Else
-//        //      PointCloud ID
-//        int modelID, markerID;
-//        NatNet_DecodeID( marker.ID, &modelID, &markerID );
-//
+        for(i=0; i < data->nLabeledMarkers; i++) {
+            bOccluded = ((data->LabeledMarkers[i].params & 0x01) != 0);
+            bPCSolved = ((data->LabeledMarkers[i].params & 0x02) != 0);
+            bModelSolved = ((data->LabeledMarkers[i].params & 0x04) != 0);
+            bHasModel = ((data->LabeledMarkers[i].params & 0x08) != 0);
+            bUnlabeled = ((data->LabeledMarkers[i].params & 0x10) != 0);
+            bActiveMarker = ((data->LabeledMarkers[i].params & 0x20) != 0);
+
+            sMarker marker = data->LabeledMarkers[i];
+
+            // Marker ID Scheme:
+            // Active Markers:
+            //   ID = ActiveID, correlates to RB ActiveLabels list
+            // Passive Markers:
+            //   If Asset with Legacy Labels
+            //      AssetID 	(Hi Word)
+            //      MemberID	(Lo Word)
+            //   Else
+            //      PointCloud ID
+            int modelID, markerID;
+            NatNet_DecodeID(marker.ID, &modelID, &markerID);
+
 //        char szMarkerType[512];
 //        if (bActiveMarker)
 //            strcpy(szMarkerType, "Active");
@@ -478,8 +492,50 @@ void NATNET_CALLCONV NatNetWrapper::DataHandler(sFrameOfMocapData* data, void* p
 //
 //        printf("%s Marker [ModelID=%d, MarkerID=%d, Occluded=%d, PCSolved=%d, ModelSolved=%d] [size=%3.2f] [pos=%3.2f,%3.2f,%3.2f]\n",
 //               szMarkerType, modelID, markerID, bOccluded, bPCSolved, bModelSolved,  marker.size, marker.x, marker.y, marker.z);
-//    }
-//
+
+            geometry_msgs::Pose marker_pose;
+            marker_pose.position.x = marker.x;
+            marker_pose.position.y = marker.y;
+            marker_pose.position.z = marker.z;
+            marker_pose.orientation.x = 0;
+            marker_pose.orientation.y = 0;
+            marker_pose.orientation.z = 0;
+            marker_pose.orientation.w = 1;
+
+            if (bActiveMarker) {
+                //TODO: ActiveMarker
+            } else if (bUnlabeled && publish_unlabeled_marker_pose_array) {
+                unlabeled_marker_pose_array.header.stamp = ros::Time::now();
+                unlabeled_marker_pose_array.header.frame_id = frame_id;
+                unlabeled_marker_pose_array.poses.push_back(marker_pose);
+            } else if(publish_labeled_marker_pose_array){
+                int labeled_marker_index = -1;
+                for(int i_model = 0; i_model < model_ids.size(); i_model++){
+                    if(modelID == model_ids[i_model]){
+                        labeled_marker_index = i_model;
+                        break;
+                    }
+                }
+                if(labeled_marker_index == -1){
+                    // data is not ready
+                    break;
+                }
+
+                labeled_marker_pose_array[labeled_marker_index].header.stamp = ros::Time::now();
+                labeled_marker_pose_array[labeled_marker_index].header.frame_id = frame_id;
+                labeled_marker_pose_array[labeled_marker_index].poses.emplace_back(marker_pose);
+            }
+        }
+        if(publish_labeled_marker_pose_array && !pubs_labeled_marker_pose_array.empty()){
+            for(int i_model=0; i_model < model_ids.size(); i_model++){
+                pubs_labeled_marker_pose_array[i_model].publish(labeled_marker_pose_array[i_model]);
+            }
+        }
+        if(publish_unlabeled_marker_pose_array){
+            pub_unlabeled_marker_pose_array.publish(unlabeled_marker_pose_array);
+        }
+    }
+
 //    // force plates
 //    printf("Force Plate [Count=%d]\n", data->nForcePlates);
 //    for(int iPlate=0; iPlate < data->nForcePlates; iPlate++)
