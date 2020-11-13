@@ -40,6 +40,8 @@ This code is based on the NatNet 3.1 SDK (https://optitrack.com/products/natnet-
 
 + False - it returns object's pose as geometry::poseStamped message.
 
-"publish_labeled_marker_pose_array": if true, publish pose of object's markers as geometry::poseArray
+"publish_labeled_marker_pose_array": if true, publish pose of object's markers as geometry::poseArray 
 
 "publish_unlabeled_marker_pose_array": if true, publish unlabeled markers as geometry::poseArray
+
+(If labeled or unlabeled markers are not published, check Motive -> Streaming Pane -> Labeled or Unlabeld Markers)
