@@ -1,5 +1,7 @@
 #include "NatNetWrapper.h"
 
+std::atomic<bool> quit(false); // signal flag
+
 NatNetWrapper* NatNetWrapper_ptr;
 void logCallbackWrapper( Verbosity level, const char* message ){
     return NatNetWrapper_ptr->MessageHandler(level, message);
@@ -13,14 +15,29 @@ void serverCallbackWrapper( const sNatNetDiscoveredServer* pNewServer, void* pUs
 
 NatNetWrapper::NatNetWrapper(){
     NatNetWrapper_ptr = this;
+    std::string message_type_;
     nh = ros::NodeHandle("~");
     nh.param<std::string>("frame_id", frame_id, "/world");
+    nh.param<std::string>("message_type", message_type_, "pose");
     nh.param<bool>("show_latency", show_latency, false);
-    nh.param<bool>("publish_with_twist", publish_with_twist, false);
     nh.param<bool>("publish_labeled_marker_pose_array", publish_labeled_marker_pose_array, false);
     nh.param<bool>("publish_unlabeled_marker_pose_array", publish_unlabeled_marker_pose_array, false);
     prefix = "/optitrack/";
     verbose_level = Verbosity_Error + 1; // Do not listen NatNetlib message
+
+    if(message_type_ == "pose"){
+        message_type = MessageType::POSE;
+    }
+    else if(message_type_ == "odom"){
+        message_type = MessageType::ODOMETRY;
+    }
+    else if(message_type_ == "tf"){
+        message_type = MessageType::TF;
+    }
+    else{
+        ROS_ERROR("[NatNetWrapper] Invalid message type. message type must be pose, twist, or tf");
+        throw std::invalid_argument("message_type");
+    }
 }
 
 int NatNetWrapper::run() {
@@ -151,12 +168,15 @@ int NatNetWrapper::run() {
 //                printf("Parent Offset : %3.2f,%3.2f,%3.2f\n", pRB->offsetx, pRB->offsety, pRB->offsetz);
 
                 model_ids.emplace_back(pRB->ID);
-                if(publish_with_twist){
-                    pubs_vision_odom.push_back(nh.advertise<nav_msgs::Odometry>(prefix + std::string(pRB->szName) + "/odometry", 10));
-                    linearKalmanFilters.emplace_back(std::make_unique<LinearKalmanFilter>());
+                model_names.emplace_back(std::string(pRB->szName));
+
+                // Initialize publisher by message type
+                if(message_type == MessageType::POSE){
+                    pubs_vision_pose.emplace_back(nh.advertise<geometry_msgs::PoseStamped>(prefix + std::string(pRB->szName) + "/poseStamped", 10));
                 }
-                else{
-                    pubs_vision_pose.push_back(nh.advertise<geometry_msgs::PoseStamped>(prefix + std::string(pRB->szName) + "/poseStamped", 10));
+                else if(message_type == MessageType::ODOMETRY){
+                    pubs_vision_odom.emplace_back(nh.advertise<nav_msgs::Odometry>(prefix + std::string(pRB->szName) + "/odometry", 10));
+                    linearKalmanFilters.emplace_back(std::make_unique<LinearKalmanFilter>());
                 }
 
                 if(publish_labeled_marker_pose_array){
@@ -236,75 +256,79 @@ int NatNetWrapper::run() {
     }
 
     // Ready to receive marker stream!
+    signal(SIGINT, NatNetWrapper::sigintCallback);
     printf("\nClient is connected to server and listening for data...\n");
     int c;
     bool bExit = false;
     ros::Rate main_rate(100);
     while(ros::ok())
     {
-        c=getch();
-        switch(c)
-        {
-            case 'q':
-                bExit = true;
-                break;
-            case 'r':
-                resetClient();
-                break;
-            case 'p':
-                sServerDescription ServerDescription;
-                memset(&ServerDescription, 0, sizeof(ServerDescription));
-                g_pClient->GetServerDescription(&ServerDescription);
-                if(!ServerDescription.HostPresent)
-                {
-                    printf("Unable to connect to server. Host not present. Exiting.");
-                    return 1;
-                }
-                break;
-            case 's':
-            {
-                printf("\n\n[NatNetWrapper] Requesting Data Descriptions...");
-                sDataDescriptions* pDataDefs = NULL;
-                iResult = g_pClient->GetDataDescriptionList(&pDataDefs);
-                if (iResult != ErrorCode_OK || pDataDefs == NULL)
-                {
-                    printf("[NatNetWrapper] Unable to retrieve Data Descriptions.");
-                }
-                else
-                {
-                    printf("[NatNetWrapper] Received %d Data Descriptions:\n", pDataDefs->nDataDescriptions);
-                }
-            }
-                break;
-            case 'm':	                        // change to multicast
-                g_connectParams.connectionType = ConnectionType_Multicast;
-                iResult = ConnectClient();
-                if(iResult == ErrorCode_OK)
-                    printf("Client connection type changed to Multicast.\n\n");
-                else
-                    printf("Error changing client connection type to Multicast.\n\n");
-                break;
-            case 'u':	                        // change to unicast
-                g_connectParams.connectionType = ConnectionType_Unicast;
-                iResult = ConnectClient();
-                if(iResult == ErrorCode_OK)
-                    printf("Client connection type changed to Unicast.\n\n");
-                else
-                    printf("Error changing client connection type to Unicast.\n\n");
-                break;
-            case 'c' :                          // connect
-                iResult = ConnectClient();
-                break;
-            case 'd' :                          // disconnect
-                // note: applies to unicast connections only - indicates to Motive to stop sending packets to that client endpoint
-                iResult = g_pClient->SendMessageAndWait("Disconnect", &response, &nBytes);
-                if (iResult == ErrorCode_OK)
-                    printf("[NatNetWrapper] Disconnected");
-                break;
-            default:
-                break;
-        }
-        if(bExit)
+//        c=getch();
+//        switch(c)
+//        {
+//            case 'q':
+//                bExit = true;
+//                break;
+//            case 'r':
+//                resetClient();
+//                break;
+//            case 'p':
+//                sServerDescription ServerDescription;
+//                memset(&ServerDescription, 0, sizeof(ServerDescription));
+//                g_pClient->GetServerDescription(&ServerDescription);
+//                if(!ServerDescription.HostPresent)
+//                {
+//                    printf("Unable to connect to server. Host not present. Exiting.");
+//                    return 1;
+//                }
+//                break;
+//            case 's':
+//            {
+//                printf("\n\n[NatNetWrapper] Requesting Data Descriptions...");
+//                sDataDescriptions* pDataDefs = NULL;
+//                iResult = g_pClient->GetDataDescriptionList(&pDataDefs);
+//                if (iResult != ErrorCode_OK || pDataDefs == NULL)
+//                {
+//                    printf("[NatNetWrapper] Unable to retrieve Data Descriptions.");
+//                }
+//                else
+//                {
+//                    printf("[NatNetWrapper] Received %d Data Descriptions:\n", pDataDefs->nDataDescriptions);
+//                }
+//            }
+//                break;
+//            case 'm':	                        // change to multicast
+//                g_connectParams.connectionType = ConnectionType_Multicast;
+//                iResult = ConnectClient();
+//                if(iResult == ErrorCode_OK)
+//                    printf("Client connection type changed to Multicast.\n\n");
+//                else
+//                    printf("Error changing client connection type to Multicast.\n\n");
+//                break;
+//            case 'u':	                        // change to unicast
+//                g_connectParams.connectionType = ConnectionType_Unicast;
+//                iResult = ConnectClient();
+//                if(iResult == ErrorCode_OK)
+//                    printf("Client connection type changed to Unicast.\n\n");
+//                else
+//                    printf("Error changing client connection type to Unicast.\n\n");
+//                break;
+//            case 'c' :                          // connect
+//                iResult = ConnectClient();
+//                break;
+//            case 'd' :                          // disconnect
+//                // note: applies to unicast connections only - indicates to Motive to stop sending packets to that client endpoint
+//                iResult = g_pClient->SendMessageAndWait("Disconnect", &response, &nBytes);
+//                if (iResult == ErrorCode_OK)
+//                    printf("[NatNetWrapper] Disconnected");
+//                break;
+//            default:
+//                break;
+//        }
+//        if(bExit)
+//            break;
+
+        if(quit.load())
             break;
 
         main_rate.sleep();
@@ -397,42 +421,36 @@ void NATNET_CALLCONV NatNetWrapper::DataHandler(sFrameOfMocapData* data, void* p
 
     // Rigid Bodies
 //    printf("Rigid Bodies [Count=%d]\n", data->nRigidBodies);
-    for(i=0; i < data->nRigidBodies; i++) {
+
+
+    for(i = 0; i < data->nRigidBodies; i++) {
+        if(model_ids.size() != data->nRigidBodies){ // Do not publish when number of data is not matched
+            break;
+        }
+
         // params
         // 0x01 : bool, rigid body was successfully tracked in this frame
         bool bTrackingValid = data->RigidBodies[i].params & 0x01;
-
 //        printf("Rigid Body [ID=%d  Error=%3.2f  Valid=%d]\n", data->RigidBodies[i].ID, data->RigidBodies[i].MeanError, bTrackingValid);
-        if ((!publish_with_twist && pubs_vision_pose.size() == data->nRigidBodies) or
-            (publish_with_twist && pubs_vision_odom.size() == data->nRigidBodies)) {
-            if (bTrackingValid) {
-                geometry_msgs::PoseStamped vision_pose;
-                vision_pose.header.stamp = ros::Time::now();
-                vision_pose.header.frame_id = frame_id;
-                vision_pose.pose.position.x = data->RigidBodies[i].x;
-                vision_pose.pose.position.y = data->RigidBodies[i].y;
-                vision_pose.pose.position.z = data->RigidBodies[i].z;
-                vision_pose.pose.orientation.x = data->RigidBodies[i].qx;
-                vision_pose.pose.orientation.y = data->RigidBodies[i].qy;
-                vision_pose.pose.orientation.z = data->RigidBodies[i].qz;
-                vision_pose.pose.orientation.w = data->RigidBodies[i].qw;
-                if (publish_with_twist) {
-                    nav_msgs::Odometry vision_odom = linearKalmanFilters[i].get()->pose_cb(vision_pose);
-                    vision_odom.header.frame_id = frame_id;
-                    vision_odom.child_frame_id = frame_id;
-                    pubs_vision_odom[i].publish(vision_odom);
-                } else {
-                    pubs_vision_pose[i].publish(vision_pose);
-                }
-            } else {
-                if (publish_with_twist) {
-                    ROS_WARN_STREAM("[NatNetWrapper] " << pubs_vision_odom[i].getTopic() << " is not published");
-                } else {
-                    ROS_WARN_STREAM("[NatNetWrapper] " << pubs_vision_pose[i].getTopic() << " is not published");
-                }
+        if (bTrackingValid) {
+            switch (message_type){
+                case POSE:
+                    publishPose(i, data->RigidBodies[i]);
+                    break;
+                case ODOMETRY:
+                    publishOdom(i, data->RigidBodies[i]);
+                    break;
+                case TF:
+                    publishTF(i, data->RigidBodies[i]);
+                    break;
+                default:
+                    break;
             }
+        } else {
+            ROS_WARN_STREAM("[NatNetWrapper] " << model_names[i] << " is not published");
         }
     }
+
 //    // Skeletons
 //    printf("Skeletons [Count=%d]\n", data->nSkeletons);
 //    for(i=0; i < data->nSkeletons; i++)
@@ -704,6 +722,9 @@ int NatNetWrapper::ConnectClient()
     return ErrorCode_OK;
 }
 
+void NatNetWrapper::sigintCallback(int signum){
+    quit.store(true);
+}
 
 void NatNetWrapper::resetClient()
 {
@@ -752,4 +773,42 @@ char NatNetWrapper::getch()
 
     return buf;
 }
+
+geometry_msgs::PoseStamped NatNetWrapper::rigidBodyToPose(const sRigidBodyData& rigid_body_data) {
+    geometry_msgs::PoseStamped pose;
+    pose.pose.position.x = rigid_body_data.x;
+    pose.pose.position.y = rigid_body_data.y;
+    pose.pose.position.z = rigid_body_data.z;
+    pose.pose.orientation.x = rigid_body_data.qx;
+    pose.pose.orientation.y = rigid_body_data.qy;
+    pose.pose.orientation.z = rigid_body_data.qz;
+    pose.pose.orientation.w = rigid_body_data.qw;
+    return pose;
+}
+
+void NatNetWrapper::publishPose(int idx, const sRigidBodyData& rigid_body_data) {
+    geometry_msgs::PoseStamped pose = rigidBodyToPose(rigid_body_data);
+    pose.header.stamp = ros::Time::now();
+    pose.header.frame_id = frame_id;
+    pubs_vision_pose[idx].publish(pose);
+}
+
+void NatNetWrapper::publishOdom(int idx, const sRigidBodyData& rigid_body_data) {
+    geometry_msgs::PoseStamped pose = rigidBodyToPose(rigid_body_data);
+    nav_msgs::Odometry vision_odom = linearKalmanFilters[idx].get()->pose_cb(pose);
+    vision_odom.header.stamp = ros::Time::now();
+    vision_odom.header.frame_id = frame_id;
+    vision_odom.child_frame_id = frame_id;
+    pubs_vision_odom[idx].publish(vision_odom);
+}
+
+void NatNetWrapper::publishTF(int idx, const sRigidBodyData& rigid_body_data) {
+    tf::Transform transform;
+    transform.setOrigin(tf::Vector3(rigid_body_data.x, rigid_body_data.y, rigid_body_data.z));
+    tf::Quaternion q(rigid_body_data.qx, rigid_body_data.qy, rigid_body_data.qz, rigid_body_data.qw);
+    transform.setRotation(q);
+    br.sendTransform(tf::StampedTransform(transform, ros::Time::now(), frame_id, model_names[idx]));
+}
+
+
 #endif

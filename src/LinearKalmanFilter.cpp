@@ -151,7 +151,7 @@ void LinearKalmanFilter::update(const double &dt, const geometry_msgs::PoseStamp
 FMatrix LinearKalmanFilter::computeF(const double &dt)
 {
     FMatrix temp = FMatrix::Zero();
-    for(int i=0; i<n; i++)
+    for(int i=0; i < Row; i++)
     {
         temp(i,i) = 1.0;
     }
@@ -177,7 +177,7 @@ GMatrix LinearKalmanFilter::computeG(const double &dt)
 QMatrix LinearKalmanFilter::computeQ(const GMatrix &G, const MVector &sigma_Q)
 {
     RMatrix temp = RMatrix::Zero();
-    for(int i=0; i<m; i++)
+    for(int i=0; i < Col; i++)
     {
         temp(i,i) = sigma_Q(i,0)*sigma_Q(i,0);
     }
@@ -188,7 +188,7 @@ QMatrix LinearKalmanFilter::computeQ(const GMatrix &G, const MVector &sigma_Q)
 RMatrix LinearKalmanFilter::computeR()
 {
     RMatrix temp = RMatrix::Zero();
-    for(int i=0; i<m; i++)
+    for(int i=0; i < Col; i++)
     {
         temp(i,i) = sigma_R(i,0);
     }

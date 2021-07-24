@@ -7,6 +7,7 @@
 #include <ros/ros.h>
 #include <geometry_msgs/PoseStamped.h>
 #include <geometry_msgs/PoseArray.h>
+#include <signal.h>
 
 #ifdef _WIN32
 #   include <conio.h>
@@ -21,6 +22,13 @@
 #include <NatNetCAPI.h>
 #include <NatNetClient.h>
 #include <LinearKalmanFilter.h>
+#include <tf/transform_broadcaster.h>
+
+enum MessageType{
+    POSE,
+    ODOMETRY,
+    TF
+};
 
 class NatNetWrapper {
 public:
@@ -33,23 +41,30 @@ public:
 
 private:
     ros::NodeHandle nh;
+    tf::TransformBroadcaster br;
     std::vector<ros::Publisher> pubs_vision_pose;
     std::vector<ros::Publisher> pubs_vision_odom;
     std::vector<ros::Publisher> pubs_labeled_marker_pose_array;
     ros::Publisher pub_unlabeled_marker_pose_array;
     std::vector<std::unique_ptr<LinearKalmanFilter>> linearKalmanFilters;
     std::vector<int> model_ids;
+    std::vector<std::string> model_names;
     std::string prefix;
     std::string frame_id;
-    bool show_latency;
+    MessageType message_type;
     int verbose_level;
-    bool publish_with_twist;
-    bool publish_labeled_marker_pose_array;
-    bool publish_unlabeled_marker_pose_array;
-    bool is_ServerDiscovered;
+    bool show_latency = false;
+    bool publish_labeled_marker_pose_array = false;
+    bool publish_unlabeled_marker_pose_array = false;
+    bool is_ServerDiscovered = false;
 
+    static void sigintCallback(int signum);
     void resetClient();
     int ConnectClient();
+    geometry_msgs::PoseStamped rigidBodyToPose(const sRigidBodyData& rigid_body_data);
+    void publishPose(int idx, const sRigidBodyData& rigid_body_data);
+    void publishOdom(int idx, const sRigidBodyData& rigid_body_data);
+    void publishTF(int idx, const sRigidBodyData& rigid_body_data);
 
     static const ConnectionType kDefaultConnectionType = ConnectionType_Multicast;
 

@@ -10,18 +10,18 @@
 
 #define PUBLISH_RAW_TWIST false
 
-#define n 6
-#define m 3
+#define Row 6
+#define Col 3
 
 using namespace Eigen;
-typedef Matrix<double, n, n> FMatrix;
-typedef Matrix<double, n, m> GMatrix;
-typedef Matrix<double, n, n> QMatrix;
-typedef Matrix<double, n, n> PMatrix;
-typedef Matrix<double, m, m> RMatrix;
-typedef Matrix<double, m, n> HMatrix;
-typedef Matrix<double, n, 1> NVector;
-typedef Matrix<double, m, 1> MVector;
+typedef Matrix<double, Row, Row> FMatrix;
+typedef Matrix<double, Row, Col> GMatrix;
+typedef Matrix<double, Row, Row> QMatrix;
+typedef Matrix<double, Row, Row> PMatrix;
+typedef Matrix<double, Col, Col> RMatrix;
+typedef Matrix<double, Col, Row> HMatrix;
+typedef Matrix<double, Row, 1> NVector;
+typedef Matrix<double, Col, 1> MVector;
 
 class LinearKalmanFilter {
 public:

@@ -2,9 +2,9 @@
 <launch>
     <node pkg="optitrack_bridge" type="optitrack_bridge_node" name="optitrack_bridge_node" output="screen">
         <param name="frame_id" value="/world" type="str" />
+        <param name="message_type" value="tf" type="str" /> <!-- pose, odom, tf -->
         <param name="show_latency" value="false" type="bool" />
-        <param name="publish_with_twist" value="false" type="bool" />
-        <param name="publish_labeled_marker_pose_array" value="false" type="bool" />
-        <param name="publish_unlabeled_marker_pose_array" value="false" type="bool" />
+        <param name="publish_labeled_marker_pose_array" value="false" type="bool" /> <!-- need to check labeled marker in motive -->
+        <param name="publish_unlabeled_marker_pose_array" value="false" type="bool" /> <!-- need to check unlabeled marker in motive -->
     </node>
 </launch>
