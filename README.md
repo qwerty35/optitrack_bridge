@@ -1,6 +1,6 @@
 # optitrack_bridge
 
-This package converts Optitrack rigidBody to ROS message.
+This package converts Optitrack rigidBody message to ROS1 pose/odometry/tf message.
 
 Tested in 
 - Ubuntu 20.04, ROS Noetic 
@@ -36,9 +36,9 @@ It assumes that your work space is in `~/catkin_ws/src`
 
 `message_type`: Ros message type.
 
-+ pose - It returns object's pose as geometry::poseStamped message.
-+ odometry - It returns object's pose+twist as nav_msgs::odometry message. The twist of object is computed by linear Kalman filter. (Error covariance is not supported yet.)
-+ tf - It returns object's pose as tf.
++ pose - It returns the object's pose as geometry::poseStamped message.
++ odometry - It returns object's pose+twist(velocity) as nav_msgs::odometry message. The twist(velocity) of the object is computed by linear Kalman filter. (Error covariance is not supported yet.)
++ tf - It returns the object's pose as tf message.
 
 `show_latency`: Print latency on the screen.
 
